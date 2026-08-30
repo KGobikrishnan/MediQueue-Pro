@@ -1,7 +1,8 @@
 import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Header, Sidebar } from './AppLayout';
+import { AppLayout } from './AppLayout';
+import { ErrorBoundary } from '../common/ErrorBoundary';
 
 export const ProtectedRoute = ({ allowedRoles = [] }) => {
   const { user, isAuthenticated } = useAuth();
@@ -11,7 +12,6 @@ export const ProtectedRoute = ({ allowedRoles = [] }) => {
   }
 
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    // Redirect to their default page based on role
     switch (user.role) {
       case 'DOCTOR':
         return <Navigate to="/doctor/consultation" replace />;
@@ -27,14 +27,10 @@ export const ProtectedRoute = ({ allowedRoles = [] }) => {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-main)' }}>
-      <Header />
-      <div style={{ display: 'flex', flex: 1 }}>
-        <Sidebar />
-        <main style={{ flex: 1, padding: '1.5rem 2rem', overflowY: 'auto' }}>
-          <Outlet />
-        </main>
-      </div>
-    </div>
+    <ErrorBoundary>
+      <AppLayout>
+        <Outlet />
+      </AppLayout>
+    </ErrorBoundary>
   );
 };

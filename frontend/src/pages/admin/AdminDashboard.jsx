@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQueue } from '../../context/QueueContext';
 import {
   BarChart,
@@ -11,19 +11,17 @@ import {
   PieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
   Legend
 } from 'recharts';
 import {
-  Activity,
   Users,
   Clock,
-  CheckCircle,
   TrendingUp,
   Stethoscope,
-  Building2,
-  Calendar
+  AlertTriangle,
+  Flame,
+  Calendar,
+  Sparkles
 } from 'lucide-react';
 
 const FOOTFALL_DATA = [
@@ -38,205 +36,262 @@ const FOOTFALL_DATA = [
   { time: '06:30 PM', patients: 30, emergency: 2 }
 ];
 
-const DEPT_LOAD_DATA = [
-  { name: 'Cardiology', value: 84, color: '#0284c7' },
-  { name: 'General Medicine', value: 142, color: '#0d9488' },
-  { name: 'Orthopedics', value: 68, color: '#f59e0b' },
-  { name: 'Pediatrics', value: 52, color: '#8b5cf6' },
-  { name: 'Dermatology', value: 40, color: '#ec4899' },
-  { name: 'Neurology', value: 31, color: '#6366f1' }
+const DEPT_CAPACITY_RINGS = [
+  { name: 'Cardiology', load: 85, color: '#0066CC', rooms: '3 of 3 Active' },
+  { name: 'General Medicine', load: 92, color: '#00C2CB', rooms: '4 of 4 Active' },
+  { name: 'Orthopedics', load: 60, color: '#FF9500', rooms: '2 of 2 Active' },
+  { name: 'Pediatrics', load: 45, color: '#8B5CF6', rooms: '2 of 2 Active' }
 ];
 
-const DOCTOR_PERFORMANCE = [
-  { doctor: 'Dr. Sarah Jenkins', dept: 'Cardiology', consulted: 32, avgTimeMin: 12, rating: '4.9/5' },
-  { doctor: 'Dr. Robert Vance', dept: 'General Medicine', consulted: 48, avgTimeMin: 8, rating: '4.8/5' },
-  { doctor: 'Dr. Rajesh Nair', dept: 'Orthopedics', consulted: 24, avgTimeMin: 16, rating: '4.9/5' },
-  { doctor: 'Dr. Elena Rostova', dept: 'Pediatrics', consulted: 36, avgTimeMin: 10, rating: '5.0/5' }
-];
+// 30-Day GitHub Contribution-style Heatmap Data
+const GENERATE_30_DAY_HEATMAP = () => {
+  const days = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000);
+    const count = Math.floor(250 + Math.random() * 200);
+    const level = count > 400 ? 4 : count > 350 ? 3 : count > 300 ? 2 : 1;
+    days.push({
+      date: d.toISOString().split('T')[0],
+      dayName: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      count,
+      level
+    });
+  }
+  return days;
+};
+
+const HEATMAP_DAYS = GENERATE_30_DAY_HEATMAP();
 
 export const AdminDashboard = () => {
   const { queues, doctors } = useQueue();
 
   const totalPatientsToday = 417;
-  const avgWaitTime = '14.2 min';
-  const opdEfficiency = '94.8%';
+  const avgWaitTimeMinutes = 24.5; // Trigger SLA Warning
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Header */}
       <div>
         <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-          OPD Executive Analytics & Hospital Intelligence
+          OPD Executive Command & Hospital Intelligence
         </h1>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.2rem 0 0 0' }}>
-          Daily footfall metrics, department queue loads, doctor turnaround time, and capacity KPIs
+          30-day OPD load heatmap • Real-time SLA breach warnings • Department capacity rings
         </p>
       </div>
 
-      {/* Metric Cards Banner */}
+      {/* SLA Breach Real-time Alert Banner if wait time > 20 min */}
+      {avgWaitTimeMinutes > 20 && (
+        <div style={{
+          background: 'var(--triage-urgent-bg)',
+          border: '1.5px solid var(--triage-urgent-border)',
+          borderRadius: 'var(--radius-md)',
+          padding: '1rem 1.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          color: 'var(--triage-urgent)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <AlertTriangle size={22} />
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '0.92rem' }}>
+                OPD Turnaround SLA Alert: Average Wait Time ({avgWaitTimeMinutes} mins) exceeds 20-minute threshold
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#92400e' }}>
+                General Medicine & Cardiology running at over 90% load. Consider opening auxiliary consultation room 206.
+              </div>
+            </div>
+          </div>
+
+          <span style={{
+            background: 'var(--triage-urgent)',
+            color: '#fff',
+            fontSize: '0.75rem',
+            fontWeight: 800,
+            padding: '0.25rem 0.65rem',
+            borderRadius: '4px'
+          }}>
+            ATTENTION REQUIRED
+          </span>
+        </div>
+      )}
+
+      {/* Stat Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem' }}>
         {[
-          { label: 'TOTAL OPD FOOTFALL TODAY', val: totalPatientsToday, delta: '+18% vs yesterday', icon: Users, color: '#0284c7' },
-          { label: 'ACTIVE CONSULTATION ROOMS', val: `${doctors.length} Doctors`, delta: '100% capacity', icon: Stethoscope, color: '#0d9488' },
-          { label: 'AVERAGE PATIENT WAIT TIME', val: avgWaitTime, delta: '-4.5 min reduction', icon: Clock, color: '#8b5cf6' },
-          { label: 'OPD RETENTION & SATISFACTION', val: opdEfficiency, delta: '★ 4.9 Hospital CSAT', icon: TrendingUp, color: '#16a34a' }
+          { label: 'TOTAL OPD FOOTFALL', val: totalPatientsToday, delta: '+18% vs yesterday', icon: Users, color: 'var(--brand-primary)' },
+          { label: 'ACTIVE CONSULTATION ROOMS', val: `${doctors.length} Doctors`, delta: '100% capacity', icon: Stethoscope, color: '#00C2CB' },
+          { label: 'AVERAGE PATIENT WAIT TIME', val: `${avgWaitTimeMinutes} min`, delta: 'SLA Exceeded (>20m)', icon: Clock, color: 'var(--triage-urgent)' },
+          { label: 'OPD RETENTION & CSAT', val: '96.2%', delta: '★ 4.9 Hospital CSAT', icon: TrendingUp, color: 'var(--triage-routine)' }
         ].map((item, idx) => {
           const Icon = item.icon;
           return (
             <div
               key={idx}
               style={{
-                background: '#ffffff',
+                background: 'var(--surface-01)',
                 borderRadius: 'var(--radius-xl)',
                 border: '1px solid var(--border-subtle)',
-                padding: '1.5rem',
-                boxShadow: 'var(--shadow-sm)',
+                padding: '1.25rem',
+                boxShadow: 'var(--shadow-subtle)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between'
               }}
             >
               <div>
-                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
                   {item.label}
                 </div>
-                <div style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: '0.25rem' }}>
+                <div style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: '0.2rem' }}>
                   {item.val}
                 </div>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: item.color, marginTop: '0.2rem' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: item.color, marginTop: '0.15rem' }}>
                   {item.delta}
                 </div>
               </div>
 
               <div style={{
-                background: `${item.color}15`,
+                background: 'var(--surface-02)',
                 color: item.color,
                 padding: '0.75rem',
-                borderRadius: 'var(--radius-lg)'
+                borderRadius: 'var(--radius-md)'
               }}>
-                <Icon size={24} />
+                <Icon size={22} />
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* Charts Row */}
+      {/* 30-Day Heatmap Calendar (GitHub Contribution Style) */}
+      <div style={{
+        background: 'var(--surface-01)',
+        borderRadius: 'var(--radius-xl)',
+        border: '1px solid var(--border-subtle)',
+        padding: '1.5rem',
+        boxShadow: 'var(--shadow-subtle)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+              30-Day OPD Patient Volume Heatmap
+            </h2>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              Historical daily patient density index (Past 30 days)
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+            <span>Less</span>
+            <span style={{ width: '12px', height: '12px', background: '#e0f2fe', borderRadius: '2px' }} />
+            <span style={{ width: '12px', height: '12px', background: '#7dd3fc', borderRadius: '2px' }} />
+            <span style={{ width: '12px', height: '12px', background: '#0284c7', borderRadius: '2px' }} />
+            <span style={{ width: '12px', height: '12px', background: '#0369a1', borderRadius: '2px' }} />
+            <span>More</span>
+          </div>
+        </div>
+
+        {/* Heatmap Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(15, 1fr)', gap: '0.5rem' }}>
+          {HEATMAP_DAYS.map((day, idx) => {
+            const bgColors = ['#f1f5f9', '#e0f2fe', '#7dd3fc', '#0284c7', '#0369a1'];
+            const bg = bgColors[day.level] || '#0284c7';
+            return (
+              <div
+                key={idx}
+                title={`${day.date} (${day.dayName}): ${day.count} Patients`}
+                style={{
+                  background: bg,
+                  borderRadius: '6px',
+                  padding: '0.6rem 0.4rem',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  transition: 'transform 120ms ease'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.08)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                <div style={{ fontSize: '0.65rem', fontWeight: 700, color: day.level >= 3 ? '#ffffff' : '#334155' }}>
+                  {day.date.slice(8)}
+                </div>
+                <div style={{ fontSize: '0.6rem', color: day.level >= 3 ? '#e0f2fe' : '#64748b' }}>
+                  {day.dayName}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Hourly Rush & Department Capacity Rings */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '1.5rem' }}>
-        {/* Footfall Hourly Rush Index (Bar Chart) */}
         <div style={{
-          background: '#ffffff',
+          background: 'var(--surface-01)',
           borderRadius: 'var(--radius-xl)',
           border: '1px solid var(--border-subtle)',
           padding: '1.5rem',
-          boxShadow: 'var(--shadow-sm)'
+          boxShadow: 'var(--shadow-subtle)'
         }}>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+          <h2 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1rem' }}>
             Hourly Patient Influx & Emergency Triage Rush
           </h2>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-            Real-time OPD token registration volume by hour
-          </p>
-
-          <div style={{ width: '100%', height: '300px' }}>
+          <div style={{ width: '100%', height: '260px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={FOOTFALL_DATA}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis dataKey="time" stroke="#94a3b8" fontSize={11} />
                 <YAxis stroke="#94a3b8" fontSize={11} />
-                <Tooltip
-                  contentStyle={{ background: '#0f172a', borderRadius: '8px', color: '#fff', border: 'none', fontSize: '0.85rem' }}
-                />
+                <Tooltip contentStyle={{ background: '#0f172a', borderRadius: '8px', color: '#fff', border: 'none', fontSize: '0.85rem' }} />
                 <Legend />
-                <Bar dataKey="patients" name="Regular OPD Tokens" fill="#0284c7" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="emergency" name="Emergency Priority" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="patients" name="Regular OPD" fill="var(--brand-primary)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="emergency" name="Emergency Priority" fill="var(--triage-emergency)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Department Queue Share (Donut / Pie Chart) */}
+        {/* Capacity Progress Rings */}
         <div style={{
-          background: '#ffffff',
+          background: 'var(--surface-01)',
           borderRadius: 'var(--radius-xl)',
           border: '1px solid var(--border-subtle)',
           padding: '1.5rem',
-          boxShadow: 'var(--shadow-sm)'
+          boxShadow: 'var(--shadow-subtle)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between'
         }}>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
-            Department Load Share
-          </h2>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-            OPD capacity distribution across specialities
-          </p>
+          <div>
+            <h2 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+              Speciality Capacity Rings
+            </h2>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+              Real-time room occupancy thresholds
+            </p>
 
-          <div style={{ width: '100%', height: '240px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={DEPT_LOAD_DATA}
-                  innerRadius={55}
-                  outerRadius={85}
-                  paddingAngle={4}
-                  dataKey="value"
-                >
-                  {DEPT_LOAD_DATA.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ background: '#0f172a', borderRadius: '8px', color: '#fff', border: 'none', fontSize: '0.85rem' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {DEPT_CAPACITY_RINGS.map((dept, i) => (
+                <div key={i}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.3rem' }}>
+                    <span style={{ color: 'var(--text-primary)' }}>{dept.name}</span>
+                    <span style={{ color: dept.load >= 90 ? 'var(--triage-emergency)' : 'var(--brand-primary)', fontFamily: 'var(--font-data)' }}>
+                      {dept.load}% Occupancy ({dept.rooms})
+                    </span>
+                  </div>
+                  <div style={{ width: '100%', height: '8px', background: '#f1f5f9', borderRadius: '999px', overflow: 'hidden' }}>
+                    <div style={{ width: `${dept.load}%`, height: '100%', background: dept.color, borderRadius: '999px' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Department Legend */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginTop: '0.5rem' }}>
-            {DEPT_LOAD_DATA.slice(0, 4).map((d, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: d.color }}></span>
-                <span style={{ color: 'var(--text-secondary)' }}>{d.name} ({d.value})</span>
-              </div>
-            ))}
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '1rem' }}>
+            Auto-refreshes every 30s via STOMP WebSocket telemetry.
           </div>
         </div>
-      </div>
-
-      {/* Doctor Performance & Turnaround Table */}
-      <div style={{
-        background: '#ffffff',
-        borderRadius: 'var(--radius-xl)',
-        border: '1px solid var(--border-subtle)',
-        padding: '1.5rem',
-        boxShadow: 'var(--shadow-sm)'
-      }}>
-        <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1rem' }}>
-          Consultant Performance & Turnaround Benchmarks
-        </h2>
-
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead>
-            <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-subtle)' }}>
-              <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)' }}>DOCTOR NAME</th>
-              <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)' }}>DEPARTMENT</th>
-              <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)' }}>TODAY'S CONSULTATIONS</th>
-              <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)' }}>AVG TIME / PATIENT</th>
-              <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)' }}>PATIENT RATING</th>
-            </tr>
-          </thead>
-          <tbody>
-            {DOCTOR_PERFORMANCE.map((doc, idx) => (
-              <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                <td style={{ padding: '0.85rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{doc.doctor}</td>
-                <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{doc.dept}</td>
-                <td style={{ padding: '0.85rem 1rem', fontWeight: 800, color: 'var(--primary-700)', fontFamily: 'JetBrains Mono' }}>{doc.consulted} Patients</td>
-                <td style={{ padding: '0.85rem 1rem', color: 'var(--text-primary)', fontSize: '0.85rem' }}>{doc.avgTimeMin} mins</td>
-                <td style={{ padding: '0.85rem 1rem', fontWeight: 700, color: '#16a34a', fontSize: '0.85rem' }}>{doc.rating}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
     </div>
   );

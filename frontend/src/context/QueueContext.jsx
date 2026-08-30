@@ -4,7 +4,7 @@ import { announceToken } from '../utils/audioHelper';
 
 const QueueContext = createContext(null);
 
-const CHANNEL_NAME = 'mediqueue_live_sync_v1';
+const CHANNEL_NAME = 'mediqueue_live_sync_v2';
 
 export const QueueProvider = ({ children }) => {
   const [queues, setQueues] = useState(() => {
@@ -23,6 +23,22 @@ export const QueueProvider = ({ children }) => {
   });
 
   const [lastCalledToken, setLastCalledToken] = useState(null);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isWsConnected, setIsWsConnected] = useState(true);
+
+  // Network & Online state listener
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Broadcast channel for multi-tab live sync
   useEffect(() => {
@@ -37,11 +53,11 @@ export const QueueProvider = ({ children }) => {
           if (payload.prescriptions) setPrescriptions(payload.prescriptions);
         } else if (type === 'TOKEN_CALLED') {
           setLastCalledToken(payload);
-          announceToken(payload.tokenNumber, payload.patientName, payload.roomNo, payload.doctorName);
+          announceToken(payload.tokenNumber, payload.patientName, payload.roomNo, payload.doctorName, payload.priority === 'EMERGENCY');
         }
       };
     } catch (e) {
-      console.warn('BroadcastChannel not supported in this environment', e);
+      console.warn('BroadcastChannel fallback', e);
     }
 
     return () => {
@@ -49,7 +65,6 @@ export const QueueProvider = ({ children }) => {
     };
   }, []);
 
-  // Save to localStorage and broadcast whenever queues change
   const syncAndBroadcast = (newQueues, newDoctors, newRx, broadcastCallEvent = null) => {
     if (newQueues) {
       setQueues(newQueues);
@@ -87,10 +102,33 @@ export const QueueProvider = ({ children }) => {
   };
 
   /**
+   * Action: Reorder or bump patient up the queue (Drag/Emergency priority)
+   */
+  const reorderQueue = (startIndex, endIndex) => {
+    const result = Array.from(queues);
+    const [removed] = result.splice(startIndex, 1);
+    result.splice(endIndex, 0, removed);
+    syncAndBroadcast(result);
+  };
+
+  /**
+   * Action: Bump patient to top of waiting queue
+   */
+  const bumpToTop = (tokenId) => {
+    const targetIdx = queues.findIndex((q) => q.id === tokenId);
+    if (targetIdx <= 0) return;
+    const result = Array.from(queues);
+    const [target] = result.splice(targetIdx, 1);
+    // Give emergency priority if bumped manually
+    target.priority = 'EMERGENCY';
+    result.unshift(target);
+    syncAndBroadcast(result);
+  };
+
+  /**
    * Action: Doctor calls next patient in queue
    */
   const callNextPatient = (doctorId) => {
-    // 1. Mark current consultation as completed if any
     let updated = queues.map((q) => {
       if (q.doctorId === doctorId && q.status === TOKEN_STATUS.IN_CONSULTATION) {
         return { ...q, status: TOKEN_STATUS.COMPLETED, completedAt: new Date().toISOString() };
@@ -98,7 +136,6 @@ export const QueueProvider = ({ children }) => {
       return q;
     });
 
-    // 2. Find next waiting token with highest priority (EMERGENCY > SENIOR > NORMAL)
     const waitingForDoc = updated
       .filter((q) => q.doctorId === doctorId && q.status === TOKEN_STATUS.WAITING)
       .sort((a, b) => {
@@ -128,18 +165,21 @@ export const QueueProvider = ({ children }) => {
     };
 
     setLastCalledToken(activeTokenObj);
-    announceToken(activeTokenObj.tokenNumber, activeTokenObj.patientName, activeTokenObj.roomNo, activeTokenObj.doctorName);
+    announceToken(
+      activeTokenObj.tokenNumber,
+      activeTokenObj.patientName,
+      activeTokenObj.roomNo,
+      activeTokenObj.doctorName,
+      activeTokenObj.priority === 'EMERGENCY'
+    );
     syncAndBroadcast(updated, null, null, activeTokenObj);
     return activeTokenObj;
   };
 
-  /**
-   * Action: Recall / Resound same token
-   */
   const recallPatient = (tokenObj) => {
     if (!tokenObj) return;
     setLastCalledToken(tokenObj);
-    announceToken(tokenObj.tokenNumber, tokenObj.patientName, tokenObj.roomNo, tokenObj.doctorName);
+    announceToken(tokenObj.tokenNumber, tokenObj.patientName, tokenObj.roomNo, tokenObj.doctorName, tokenObj.priority === 'EMERGENCY');
     try {
       const channel = new BroadcastChannel(CHANNEL_NAME);
       channel.postMessage({
@@ -150,25 +190,16 @@ export const QueueProvider = ({ children }) => {
     } catch {}
   };
 
-  /**
-   * Action: Complete current patient
-   */
   const completePatient = (tokenId) => {
     const updated = queues.map((q) => (q.id === tokenId ? { ...q, status: TOKEN_STATUS.COMPLETED, completedAt: new Date().toISOString() } : q));
     syncAndBroadcast(updated);
   };
 
-  /**
-   * Action: Mark No Show
-   */
   const markNoShow = (tokenId) => {
     const updated = queues.map((q) => (q.id === tokenId ? { ...q, status: TOKEN_STATUS.NO_SHOW } : q));
     syncAndBroadcast(updated);
   };
 
-  /**
-   * Action: Add Walk-in Patient & Generate Token
-   */
   const addWalkInPatient = (patientData) => {
     const deptDoc = doctors.find((d) => d.id === patientData.doctorId) || doctors[0];
     const deptPrefix = patientData.deptCode || 'OPD';
@@ -199,9 +230,6 @@ export const QueueProvider = ({ children }) => {
     return newToken;
   };
 
-  /**
-   * Action: Save digital prescription
-   */
   const savePrescription = (rx) => {
     const newRx = {
       id: `rx-${Date.now()}`,
@@ -213,9 +241,6 @@ export const QueueProvider = ({ children }) => {
     return newRx;
   };
 
-  /**
-   * Action: Reset Demo State to Initial Seed
-   */
   const resetDemoData = () => {
     localStorage.removeItem('mediqueue_queues_state');
     localStorage.removeItem('mediqueue_doctors_state');
@@ -233,6 +258,10 @@ export const QueueProvider = ({ children }) => {
         doctors,
         prescriptions,
         lastCalledToken,
+        isOnline,
+        isWsConnected,
+        reorderQueue,
+        bumpToTop,
         callNextPatient,
         recallPatient,
         completePatient,

@@ -1,281 +1,276 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import React, { useState } from 'react';
 import { useQueue } from '../../context/QueueContext';
-import { TOKEN_STATUS } from '../../utils/constants';
+import { generatePrescriptionPDF } from '../../utils/pdfGenerator';
 import { generateTokenSlipPDF } from '../../utils/pdfGenerator';
 import {
-  Activity,
-  Calendar,
-  Clock,
-  FileText,
   HeartPulse,
   Printer,
+  Share2,
+  CheckCircle2,
+  Clock,
+  Radio,
+  FileText,
+  Calendar,
   Sparkles,
-  Stethoscope,
-  Users,
-  CheckCircle2
+  PhoneCall,
+  ExternalLink
 } from 'lucide-react';
 
 export const PatientDashboard = () => {
-  const { user } = useAuth();
-  const { queues, prescriptions } = useQueue();
-  const navigate = useNavigate();
+  const { queues, prescriptions, lastCalledToken } = useQueue();
+  const [copiedShare, setCopiedShare] = useState(false);
 
-  // Find active token associated with patient phone or name
-  const userPhone = user?.phone || '9840112345';
-  const userName = user?.name || 'Karthik Ramanathan';
+  // Fallback demo patient Karthik Ramanathan
+  const myToken = queues.find((q) => q.patientName === 'Karthik Ramanathan') || queues[0];
 
-  const myToken = queues.find(
-    (q) => (q.phone === userPhone || q.patientName === userName) && (q.status === TOKEN_STATUS.WAITING || q.status === TOKEN_STATUS.IN_CONSULTATION)
-  ) || queues[0]; // fallback to first token for demonstration
-
-  // Calculate position in line for this token
-  const tokensAhead = myToken
+  const waitingAhead = myToken
     ? queues.filter(
         (q) =>
           q.doctorId === myToken.doctorId &&
-          q.status === TOKEN_STATUS.WAITING &&
+          q.status === 'WAITING' &&
           new Date(q.createdAt) < new Date(myToken.createdAt)
       ).length
     : 0;
 
-  const estimatedWaitMin = myToken?.status === TOKEN_STATUS.IN_CONSULTATION ? 0 : (tokensAhead + 1) * 12;
+  const isMyTokenActive = myToken?.status === 'IN_CONSULTATION';
+  const totalInQueue = waitingAhead + (isMyTokenActive ? 0 : 1);
+  const currentStep = isMyTokenActive ? totalInQueue : totalInQueue - waitingAhead;
+
+  const handleShareWhatsApp = () => {
+    const text = encodeURIComponent(
+      `Hospital OPD Live Tracker: My Token ${myToken.tokenNumber} is currently at position #${waitingAhead + 1} with ${myToken.doctorName} (${myToken.roomNo}). Track live: https://mediqueuepro.org/track`
+    );
+    window.open(`https://wa.me/?text=${text}`, '_blank');
+    setCopiedShare(true);
+    setTimeout(() => setCopiedShare(false), 3000);
+  };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '1050px', margin: '0 auto' }}>
-      {/* Welcome & Quick Action Card */}
-      <div style={{
-        background: 'linear-gradient(135deg, #0b4175, #025cb0)',
-        color: '#ffffff',
-        borderRadius: 'var(--radius-xl)',
-        padding: '2rem',
-        boxShadow: 'var(--shadow-lg)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-      }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
-            <span style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '0.2rem 0.6rem', borderRadius: 'var(--radius-full)', fontSize: '0.75rem', fontWeight: 800 }}>
-              OPD PATIENT PORTAL
-            </span>
-            <span style={{ fontSize: '0.85rem', color: '#93c5fd' }}>Verified Mobile: {userPhone}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '1000px', margin: '0 auto' }}>
+      {/* Turn Notification Hero Banner (Takes over if active) */}
+      {isMyTokenActive && (
+        <div className="emergency-pulse" style={{
+          background: 'linear-gradient(135deg, #15803d, #166534)',
+          borderRadius: 'var(--radius-xl)',
+          padding: '1.75rem 2rem',
+          color: '#ffffff',
+          boxShadow: 'var(--shadow-raised)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+              <Radio size={20} />
+              <span style={{ fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                DOCTOR IS CALLING YOU NOW
+              </span>
+            </div>
+            <h1 style={{ fontSize: '1.75rem', fontWeight: 900, margin: 0 }}>
+              Please Proceed To {myToken.roomNo}
+            </h1>
+            <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.9rem', color: '#bbf7d0' }}>
+              {myToken.doctorName} • {myToken.department?.toUpperCase()}
+            </p>
           </div>
-          <h1 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>
-            Hello, {userName}
-          </h1>
-          <p style={{ margin: '0.3rem 0 0 0', fontSize: '0.9rem', color: '#e0f2fe' }}>
-            Live status of your hospital appointment, token queue position, and prescriptions.
-          </p>
+
+          <button
+            onClick={() => window.open('/live-queue', '_blank')}
+            style={{
+              background: '#ffffff',
+              color: '#15803d',
+              border: 'none',
+              borderRadius: 'var(--radius-md)',
+              padding: '0.75rem 1.25rem',
+              fontWeight: 800,
+              fontSize: '0.9rem',
+              cursor: 'pointer'
+            }}
+          >
+            View Live TV Screen
+          </button>
         </div>
+      )}
 
-        <button
-          onClick={() => navigate('/patient/book')}
-          style={{
-            background: '#ffffff',
-            color: '#0b4175',
-            border: 'none',
-            borderRadius: 'var(--radius-lg)',
-            padding: '0.85rem 1.5rem',
-            fontWeight: 800,
-            fontSize: '0.95rem',
-            boxShadow: 'var(--shadow-md)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
-          <Calendar size={18} />
-          <span>Book New OPD Slot</span>
-        </button>
-      </div>
-
-      {/* Main Grid: Active Live Token Tracker + Quick Links */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '1.5rem' }}>
-        {/* Left Side: Live Token Card */}
-        {myToken ? (
-          <div style={{
-            background: '#ffffff',
-            borderRadius: 'var(--radius-xl)',
-            border: '1px solid var(--border-subtle)',
-            padding: '2rem',
-            boxShadow: 'var(--shadow-md)',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between'
-          }}>
+      {/* Main Token Tracker Card */}
+      {myToken ? (
+        <div style={{
+          background: 'var(--surface-01)',
+          borderRadius: 'var(--radius-xl)',
+          border: '1px solid var(--border-subtle)',
+          padding: '2rem',
+          boxShadow: 'var(--shadow-card)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1.5rem'
+        }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '1rem' }}>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <HeartPulse size={24} color="var(--primary-600)" />
-                  <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-primary)' }}>
-                    Your Active OPD Token
-                  </span>
-                </div>
-
-                {myToken.status === TOKEN_STATUS.IN_CONSULTATION ? (
-                  <span style={{ background: '#dcfce7', color: '#15803d', fontWeight: 800, fontSize: '0.8rem', padding: '0.3rem 0.8rem', borderRadius: 'var(--radius-full)' }}>
-                    🔔 IT'S YOUR TURN (ENTER ROOM)
-                  </span>
-                ) : (
-                  <span style={{ background: '#fef3c7', color: '#b45309', fontWeight: 800, fontSize: '0.8rem', padding: '0.3rem 0.8rem', borderRadius: 'var(--radius-full)' }}>
-                    IN QUEUE • STANDBY
-                  </span>
-                )}
-              </div>
-
-              {/* Big Token Display */}
-              <div style={{
-                background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-                borderRadius: 'var(--radius-lg)',
-                padding: '1.5rem',
-                textAlign: 'center',
-                border: '1px solid var(--primary-200)',
-                marginBottom: '1.5rem'
-              }}>
-                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary-700)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  TOKEN NUMBER
-                </div>
-                <div style={{ fontSize: '3.6rem', fontWeight: 900, fontFamily: 'JetBrains Mono', color: 'var(--primary-800)', letterSpacing: '-0.02em', margin: '0.2rem 0' }}>
-                  {myToken.tokenNumber}
-                </div>
-                <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {myToken.department?.toUpperCase()} • {myToken.doctorName}
-                </div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  Proceed to: <strong>{myToken.roomNo}</strong>
-                </div>
-              </div>
-
-              {/* Queue Position & Estimated Wait Stat Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-                <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>PATIENTS AHEAD OF YOU</div>
-                  <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '0.2rem' }}>
-                    {myToken.status === TOKEN_STATUS.IN_CONSULTATION ? '0 (Now Inside)' : tokensAhead}
-                  </div>
-                </div>
-
-                <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>ESTIMATED WAIT TIME</div>
-                  <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--primary-600)', marginTop: '0.2rem' }}>
-                    ~{estimatedWaitMin} Mins
-                  </div>
-                </div>
-              </div>
+              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                Patient Appointment Session
+              </span>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0.2rem 0 0 0' }}>
+                {myToken.patientName} ({myToken.phone})
+              </h2>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                onClick={handleShareWhatsApp}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  background: '#25D366',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '0.45rem 0.85rem',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                <Share2 size={14} />
+                <span>{copiedShare ? 'Opening WhatsApp...' : 'Share Status with Family'}</span>
+              </button>
+
               <button
                 onClick={() => generateTokenSlipPDF(myToken)}
                 style={{
-                  flex: 1,
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  background: 'var(--primary-600)',
+                  gap: '0.35rem',
+                  background: 'var(--surface-02)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '0.45rem 0.85rem',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                <Printer size={14} />
+                <span>Download Slip</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Big Token Number */}
+          <div style={{
+            background: 'linear-gradient(135deg, var(--brand-light), #e0f2fe)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '2rem',
+            textAlign: 'center',
+            border: '1px solid var(--border-subtle)'
+          }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--brand-dark)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              YOUR ASSIGNED OPD TOKEN
+            </div>
+            <div style={{ fontSize: '4.5rem', fontWeight: 900, fontFamily: 'var(--font-data)', color: 'var(--brand-primary)', letterSpacing: '0.05em', margin: '0.3rem 0' }}>
+              {myToken.tokenNumber}
+            </div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+              {myToken.doctorName} • {myToken.roomNo}
+            </div>
+          </div>
+
+          {/* Animated Queue Progress Bar (●●●○○) */}
+          <div style={{
+            background: 'var(--surface-02)',
+            borderRadius: 'var(--radius-md)',
+            padding: '1.25rem',
+            border: '1px solid var(--border-subtle)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                Live Queue Progress Index
+              </span>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--brand-primary)', fontFamily: 'var(--font-data)' }}>
+                {isMyTokenActive ? 'In Consultation (0 ahead)' : `${waitingAhead} Patients Ahead of You`}
+              </span>
+            </div>
+
+            {/* Visual Dot / Progress Bar */}
+            <div style={{
+              width: '100%',
+              height: '10px',
+              background: '#e2e8f0',
+              borderRadius: '999px',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                width: isMyTokenActive ? '100%' : `${Math.max(25, 100 - (waitingAhead * 20))}%`,
+                height: '100%',
+                background: isMyTokenActive ? '#22c55e' : 'var(--brand-primary)',
+                transition: 'width 300ms ease'
+              }} />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+              <span>Registered at Triage</span>
+              <span>Waiting Room Standby</span>
+              <span>Consultation Room</span>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Prescriptions History Grid */}
+      <div style={{
+        background: 'var(--surface-01)',
+        borderRadius: 'var(--radius-xl)',
+        border: '1px solid var(--border-subtle)',
+        padding: '1.5rem',
+        boxShadow: 'var(--shadow-subtle)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+            My Verified Electronic Prescriptions
+          </h3>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {prescriptions.map((rx) => (
+            <div
+              key={rx.id}
+              style={{
+                background: 'var(--surface-02)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--radius-md)',
+                padding: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
+                  {rx.diagnosis}
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                  {rx.doctorName} ({rx.deptName || 'Cardiology'}) • Date: {rx.date}
+                </div>
+              </div>
+
+              <button
+                onClick={() => generatePrescriptionPDF(rx)}
+                style={{
+                  background: 'var(--brand-primary)',
                   color: '#ffffff',
                   border: 'none',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '0.75rem',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '0.45rem 1rem',
+                  fontSize: '0.82rem',
                   fontWeight: 700,
-                  fontSize: '0.9rem'
+                  cursor: 'pointer'
                 }}
               >
-                <Printer size={18} />
-                <span>Download Token Slip PDF</span>
-              </button>
-
-              <button
-                onClick={() => window.open('/live-queue', '_blank')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  background: '#f1f5f9',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '0.75rem 1rem',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                  color: 'var(--text-primary)'
-                }}
-              >
-                <span>Live TV Tracker</span>
+                Download PDF
               </button>
             </div>
-          </div>
-        ) : (
-          <div style={{ background: '#ffffff', padding: '3rem', borderRadius: 'var(--radius-xl)', textAlign: 'center' }}>
-            <h3>No active token currently.</h3>
-            <button onClick={() => navigate('/patient/book')}>Book an Appointment</button>
-          </div>
-        )}
-
-        {/* Right Side: Quick History & Recent Prescriptions */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: 'var(--radius-xl)',
-            border: '1px solid var(--border-subtle)',
-            padding: '1.5rem'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-              <h2 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-                Recent Digital Prescriptions
-              </h2>
-              <button
-                onClick={() => navigate('/patient/prescriptions')}
-                style={{ background: 'transparent', border: 'none', color: 'var(--primary-600)', fontSize: '0.75rem', fontWeight: 700 }}
-              >
-                View All →
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {prescriptions.slice(0, 3).map((rx) => (
-                <div
-                  key={rx.id}
-                  style={{
-                    padding: '0.75rem',
-                    background: '#f8fafc',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--border-subtle)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between'
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                      {rx.diagnosis}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      {rx.doctorName} • {rx.date}
-                    </div>
-                  </div>
-                  <FileText size={18} color="var(--primary-600)" />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div style={{
-            background: '#f0fdf4',
-            border: '1px solid #bbf7d0',
-            borderRadius: 'var(--radius-xl)',
-            padding: '1.25rem'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#16a34a', fontWeight: 800, fontSize: '0.9rem' }}>
-              <CheckCircle2 size={18} />
-              <span>SMS Alert Activated</span>
-            </div>
-            <p style={{ fontSize: '0.8rem', color: '#15803d', margin: '0.3rem 0 0 0' }}>
-              We will send you an SMS buzzer 10 minutes before your token is called by the doctor.
-            </p>
-          </div>
+          ))}
         </div>
       </div>
     </div>
