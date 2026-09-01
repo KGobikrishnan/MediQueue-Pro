@@ -102,6 +102,48 @@ export const QueueProvider = ({ children }) => {
   };
 
   /**
+   * Action: Doctor Management - Add Doctor
+   */
+  const addDoctor = (doctorData) => {
+    const newDoc = {
+      id: `doc-${Date.now()}`,
+      name: doctorData.name,
+      doctorId: doctorData.doctorId || `DOC-${Math.floor(1000 + Math.random() * 9000)}`,
+      email: doctorData.email || `${doctorData.name.toLowerCase().replace(/[^a-z0-9]/g, '')}@mediqueue.pro`,
+      password: doctorData.password || 'Doctor@123',
+      qualification: doctorData.qualification || 'MBBS, MD',
+      department: doctorData.department,
+      deptName: doctorData.deptName || 'General Medicine',
+      roomNo: doctorData.roomNo || 'Room 101',
+      status: doctorData.status || 'AVAILABLE',
+      avgConsultTimeMin: parseInt(doctorData.avgConsultTimeMin, 10) || 12,
+      todayConsulted: 0,
+      photoUrl: doctorData.photoUrl || `https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=300`,
+      experience: doctorData.experience || '8+ Years',
+      phone: doctorData.phone || '+91 98400 11223'
+    };
+    const updated = [...doctors, newDoc];
+    syncAndBroadcast(null, updated, null);
+    return newDoc;
+  };
+
+  /**
+   * Action: Doctor Management - Update Doctor
+   */
+  const updateDoctor = (doctorId, updatedFields) => {
+    const updated = doctors.map((d) => (d.id === doctorId ? { ...d, ...updatedFields } : d));
+    syncAndBroadcast(null, updated, null);
+  };
+
+  /**
+   * Action: Doctor Management - Delete Doctor
+   */
+  const deleteDoctor = (doctorId) => {
+    const updated = doctors.filter((d) => d.id !== doctorId);
+    syncAndBroadcast(null, updated, null);
+  };
+
+  /**
    * Action: Reorder or bump patient up the queue (Drag/Emergency priority)
    */
   const reorderQueue = (startIndex, endIndex) => {
@@ -119,7 +161,6 @@ export const QueueProvider = ({ children }) => {
     if (targetIdx <= 0) return;
     const result = Array.from(queues);
     const [target] = result.splice(targetIdx, 1);
-    // Give emergency priority if bumped manually
     target.priority = 'EMERGENCY';
     result.unshift(target);
     syncAndBroadcast(result);
@@ -260,6 +301,9 @@ export const QueueProvider = ({ children }) => {
         lastCalledToken,
         isOnline,
         isWsConnected,
+        addDoctor,
+        updateDoctor,
+        deleteDoctor,
         reorderQueue,
         bumpToTop,
         callNextPatient,
