@@ -24,7 +24,8 @@ import {
   Flame,
   Volume2,
   ChevronRight,
-  BellRing
+  BellRing,
+  FolderHeart
 } from 'lucide-react';
 
 export const AppLayout = ({ children }) => {
@@ -90,7 +91,8 @@ export const AppLayout = ({ children }) => {
       case ROLES.ADMIN:
         return [
           { to: '/admin/analytics', label: 'Executive Analytics', icon: LayoutDashboard },
-          { to: '/admin/doctors', label: 'Doctors', icon: Users },
+          { to: '/admin/doctors', label: 'Doctor Management', icon: Stethoscope },
+          { to: '/admin/patients', label: 'Patient Directory & EHR', icon: Users, badge: 'EHR' },
           { to: '/admin/departments', label: 'Departments', icon: Building2 }
         ];
       default:
@@ -361,7 +363,7 @@ export const AppLayout = ({ children }) => {
           onMouseEnter={() => setIsRailExpanded(true)}
           onMouseLeave={() => setIsRailExpanded(false)}
           style={{
-            width: isRailExpanded ? '220px' : '52px',
+            width: isRailExpanded ? '230px' : '52px',
             transition: 'width 180ms cubic-bezier(0.4, 0, 0.2, 1)',
             background: 'var(--surface-01)',
             borderRight: '1px solid var(--border-subtle)',
@@ -401,6 +403,18 @@ export const AppLayout = ({ children }) => {
                   {isRailExpanded && (
                     <span style={{ flex: 1, textOverflow: 'ellipsis', overflow: 'hidden' }}>
                       {item.label}
+                    </span>
+                  )}
+                  {isRailExpanded && item.badge && (
+                    <span style={{
+                      fontSize: '0.65rem',
+                      fontWeight: 800,
+                      padding: '0.1rem 0.4rem',
+                      borderRadius: '4px',
+                      background: 'var(--brand-primary)',
+                      color: '#ffffff'
+                    }}>
+                      {item.badge}
                     </span>
                   )}
                   {isRailExpanded && item.shortcut && (

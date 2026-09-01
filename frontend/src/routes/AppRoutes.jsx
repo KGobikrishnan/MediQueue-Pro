@@ -24,6 +24,7 @@ import { MyPrescriptions } from '../pages/patient/MyPrescriptions';
 // Admin Pages
 import { AdminDashboard } from '../pages/admin/AdminDashboard';
 import { DoctorManagement } from '../pages/admin/DoctorManagement';
+import { PatientManagement } from '../pages/admin/PatientManagement';
 import { DeptManagement } from '../pages/admin/DeptManagement';
 
 export const AppRoutes = () => {
@@ -58,6 +59,7 @@ export const AppRoutes = () => {
       <Route element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]} />}>
         <Route path="/admin/analytics" element={<AdminDashboard />} />
         <Route path="/admin/doctors" element={<DoctorManagement />} />
+        <Route path="/admin/patients" element={<PatientManagement />} />
         <Route path="/admin/departments" element={<DeptManagement />} />
       </Route>
 
